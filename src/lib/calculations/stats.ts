@@ -152,10 +152,9 @@ export  function computeActivityStats(
     events: CalendarEvent[],
     searchString: string
 ) : ActivityStats {
-    // Match exact title (case-insensitive) to match dashboard behavior
-    const activityEvents = events.filter((event) => 
-        event.title.toLowerCase() === searchString.toLowerCase()
-    ); 
+    // Use events as-is (they're already filtered by substring matching in ActivityPageClient)
+    // This allows combining stats for all events matching a substring search
+    const activityEvents = events;
 
     // Handle empty case
     if (activityEvents.length === 0) {

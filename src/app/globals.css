@@ -1045,3 +1045,10 @@ body {
   color: var(--text-primary);
 }
 
+@keyframes edgePulse {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  55%  { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+

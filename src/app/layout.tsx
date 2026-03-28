@@ -6,6 +6,8 @@ import { GlobalFilterBar } from "@/components/GlobalFilterBar";
 import { FilterProvider } from "@/contexts/FilterContext";
 import { EventsProvider } from "@/contexts/EventsContext";
 import { ProProvider } from "@/contexts/ProContext";
+import { ChatProvider } from "@/contexts/ChatContext";
+import { ChatSidebar } from "@/components/ChatSidebar";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -148,17 +150,10 @@ export default function RootLayout({
       </head>
       <body className={`${urbanist.className} antialiased`} style={{ colorScheme: 'light', backgroundColor: 'var(--page-bg)' }} suppressHydrationWarning>
         <ProProvider>
+        <ChatProvider>
         <FilterProvider>
           <EventsProvider>
             <div className="flex min-h-dvh flex-col bg-[color:var(--page-bg)]">
-              {/* Scattered hearts */}
-              {/* <div className="heart heart-1">♥</div>
-              <div className="heart heart-2">♥</div>
-              <div className="heart heart-3">♥</div>
-              <div className="heart heart-4">♥</div>
-              <div className="heart heart-5">♥</div> */}
-
-
               <AppHeader />
               <Suspense fallback={null}>
                 <GlobalFilterBar />
@@ -170,8 +165,10 @@ export default function RootLayout({
                 {children}
               </div>
             </div>
+            <ChatSidebar />
           </EventsProvider>
         </FilterProvider>
+        </ChatProvider>
         </ProProvider>
         <Analytics />
       </body>

@@ -48,3 +48,5 @@ export function filterHiddenEvents(events: CalendarEvent[]): CalendarEvent[] {
   }
 }
 
+
+

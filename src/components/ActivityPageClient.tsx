@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useFilter } from "@/contexts/FilterContext";
 import {
   computeActivityStats,
@@ -59,9 +58,6 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
     maxDate,
     setMaxDate,
   } = useFilter();
-  const { hiddenStateVersion } = useEvents(); // Subscribe to hidden state changes
-
-
   // Determine search mode based on searchType parameter
   const isExactMatch = searchType === "event";
   

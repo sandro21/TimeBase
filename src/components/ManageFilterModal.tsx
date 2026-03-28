@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useEvents } from "@/contexts/EventsContext";
 import { detectDataQualityIssues, DataQualityIssue } from "@/lib/calculations/activity-suggestions";
+import { parseIcsToEventsBrowser } from "@/lib/calculations/parse-ics-browser";
+import { CalendarEvent } from "@/lib/calculations/stats";
 import { Eye, EyeOff } from "lucide-react";
 
 interface CalendarSource {
@@ -33,6 +35,8 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
   const [initialHiddenIssueIds, setInitialHiddenIssueIds] = useState<Set<string>>(new Set());
   const [pendingHiddenActivityNames, setPendingHiddenActivityNames] = useState<Set<string>>(new Set());
   const [initialHiddenActivityNames, setInitialHiddenActivityNames] = useState<Set<string>>(new Set()); // Track initial state
+  const [pendingHiddenCalendarIds, setPendingHiddenCalendarIds] = useState<Set<string>>(new Set());
+  const [initialHiddenCalendarIds, setInitialHiddenCalendarIds] = useState<Set<string>>(new Set());
   const { events, refreshHiddenState } = useEvents();
 
   // Load calendars from localStorage
@@ -63,7 +67,7 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
     };
   }, [isOpen]);
 
-  // Initialize hidden activities and issues state when modal opens
+  // Initialize hidden activities, issues, and calendars state when modal opens
   useEffect(() => {
     if (isOpen) {
       // Load from localStorage
@@ -77,12 +81,52 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
       const initialHiddenIssues = storedIssues ? new Set<string>(JSON.parse(storedIssues)) : new Set<string>();
       setInitialHiddenIssueIds(initialHiddenIssues);
       setPendingHiddenIssueIds(initialHiddenIssues);
+      
+      // Initialize hidden calendars from localStorage
+      const storedHiddenCalendars = typeof window !== 'undefined' ? localStorage.getItem('hiddenCalendarIds') : null;
+      const initialHiddenCalendars = storedHiddenCalendars ? new Set<string>(JSON.parse(storedHiddenCalendars)) : new Set<string>();
+      setInitialHiddenCalendarIds(initialHiddenCalendars);
+      setPendingHiddenCalendarIds(initialHiddenCalendars);
     }
   }, [isOpen]); // Remove unused dependencies
 
-  // Get event count for a calendar
+  // Get event count for a calendar (including hidden calendars)
   const getEventCount = (calendarId: string): number => {
-    return events.filter(event => event.calendarId === calendarId).length;
+    if (typeof window === 'undefined') return 0;
+    
+    try {
+      // Load events directly from localStorage to get true count (ignoring hidden calendar filter)
+      const storedCalendars = JSON.parse(localStorage.getItem('uploadedCalendars') || '[]');
+      const calendar = storedCalendars.find((cal: CalendarSource) => cal.id === calendarId);
+      if (!calendar) return 0;
+      
+      // Load removed event IDs
+      const removedEventIds = new Set(JSON.parse(localStorage.getItem('removedEventIds') || '[]'));
+      
+      let calendarEvents: CalendarEvent[] = [];
+      
+      // Check if this is a Google calendar
+      if (calendar.source === 'google' && calendar.googleCalendarId) {
+        // Load events from googleEvents storage
+        const googleEvents = JSON.parse(localStorage.getItem('googleCalendarEvents') || '{}');
+        const storedEvents = googleEvents[calendar.id] || [];
+        // Convert date strings back to Date objects
+        calendarEvents = storedEvents.map((e: any) => ({
+          ...e,
+          start: new Date(e.start),
+          end: new Date(e.end),
+        }));
+      } else if (calendar.icsText) {
+        // Parse ICS file
+        calendarEvents = parseIcsToEventsBrowser(calendar.icsText, calendar.id);
+      }
+      
+      // Filter out removed events
+      return calendarEvents.filter((event) => !removedEventIds.has(event.id)).length;
+    } catch (error) {
+      console.error('Error getting event count:', error);
+      return 0;
+    }
   };
 
   // Get calendar color (default to a color based on index if not set)
@@ -210,6 +254,9 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
   // Calculate pending changes count
   const pendingActivityChanges = Array.from(pendingHiddenActivityNames).filter(name => !initialHiddenActivityNames.has(name)).length +
                                  Array.from(initialHiddenActivityNames).filter(name => !pendingHiddenActivityNames.has(name)).length;
+  
+  const pendingCalendarChanges = Array.from(pendingHiddenCalendarIds).filter(id => !initialHiddenCalendarIds.has(id)).length +
+                                 Array.from(initialHiddenCalendarIds).filter(id => !pendingHiddenCalendarIds.has(id)).length;
 
   if (!isOpen) return null;
 
@@ -283,24 +330,37 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
                       {/* Calendar List */}
                       <div className="space-y-4">
                         {yourCalendars.map((calendar, index) => {
-                          const isEnabled = enabledCalendars.has(calendar.id);
+                          const isHidden = pendingHiddenCalendarIds.has(calendar.id);
                           const eventCount = getEventCount(calendar.id);
                           const calendarColor = getCalendarColor(calendar, index);
+                          
+                          const toggleCalendar = () => {
+                            setPendingHiddenCalendarIds(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(calendar.id)) {
+                                newSet.delete(calendar.id);
+                              } else {
+                                newSet.add(calendar.id);
+                              }
+                              return newSet;
+                            });
+                            setPendingChanges(prev => prev + 1);
+                          };
                           
                           return (
                             <div key={calendar.id} className="flex items-center gap-4">
                               {/* Toggle Switch */}
                               <button
-                                onClick={() => toggleCalendar(calendar.id)}
+                                onClick={toggleCalendar}
                                 className="relative w-12 h-6 rounded-full transition-colors flex-shrink-0"
                                 style={{
-                                  backgroundColor: isEnabled ? 'var(--primary)' : 'rgba(0, 0, 0, 0.2)',
+                                  backgroundColor: !isHidden ? 'var(--primary)' : 'rgba(0, 0, 0, 0.2)',
                                 }}
                               >
                                 <span
                                   className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
                                   style={{
-                                    left: isEnabled ? 'calc(100% - 1rem - 4px)' : '4px',
+                                    left: !isHidden ? 'calc(100% - 1rem - 4px)' : '4px',
                                   }}
                                 />
                               </button>
@@ -341,25 +401,38 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
                       {/* Calendar List */}
                       <div className="space-y-4">
                         {otherCalendars.map((calendar, index) => {
-                          const isEnabled = enabledCalendars.has(calendar.id);
+                          const isHidden = pendingHiddenCalendarIds.has(calendar.id);
                           const eventCount = getEventCount(calendar.id);
                           // Use index offset for color calculation
                           const calendarColor = getCalendarColor(calendar, yourCalendars.length + index);
+                          
+                          const toggleCalendar = () => {
+                            setPendingHiddenCalendarIds(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(calendar.id)) {
+                                newSet.delete(calendar.id);
+                              } else {
+                                newSet.add(calendar.id);
+                              }
+                              return newSet;
+                            });
+                            setPendingChanges(prev => prev + 1);
+                          };
                           
                           return (
                             <div key={calendar.id} className="flex items-center gap-4">
                               {/* Toggle Switch */}
                               <button
-                                onClick={() => toggleCalendar(calendar.id)}
+                                onClick={toggleCalendar}
                                 className="relative w-12 h-6 rounded-full transition-colors flex-shrink-0"
                                 style={{
-                                  backgroundColor: isEnabled ? 'var(--primary)' : 'rgba(0, 0, 0, 0.2)',
+                                  backgroundColor: !isHidden ? 'var(--primary)' : 'rgba(0, 0, 0, 0.2)',
                                 }}
                               >
                                 <span
                                   className="absolute top-1 w-4 h-4 bg-white rounded-full transition-transform"
                                   style={{
-                                    left: isEnabled ? 'calc(100% - 1rem - 4px)' : '4px',
+                                    left: !isHidden ? 'calc(100% - 1rem - 4px)' : '4px',
                                   }}
                                 />
                               </button>
@@ -408,7 +481,7 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
                       <button
                         key={filter}
                         onClick={() => setHideActivitiesFilter(filter)}
-                        className="text-[24px] font-medium px-6 border-r border-[color:var(--text-secondary)] last:border-r-0"
+                        className="text-[24px] font-medium px-6 border-r border-[color:var(--text-secondary)]"
                         style={{
                           color: hideActivitiesFilter === filter ? 'var(--text-primary)' : 'var(--text-secondary)',
                           backgroundColor: hideActivitiesFilter === filter ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
@@ -419,6 +492,23 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
                         {filter === "Hidden" && ` (${getFilteredActivities("Hidden").length})`}
                       </button>
                     ))}
+                    {/* Reset All button */}
+                    <button
+                      onClick={() => {
+                        // Reset all hidden activities and issues
+                        setPendingHiddenActivityNames(new Set());
+                        setPendingHiddenIssueIds(new Set());
+                        setInitialHiddenActivityNames(new Set());
+                        setInitialHiddenIssueIds(new Set());
+                      }}
+                      className="text-[24px] font-medium px-6 border-r border-[color:var(--text-secondary)] last:border-r-0"
+                      style={{
+                        color: 'var(--primary)',
+                        backgroundColor: 'transparent',
+                      }}
+                    >
+                      Reset All
+                    </button>
                   </div>
                 </div>
                 
@@ -623,7 +713,7 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
           <div className="border-t border-[color:var(--text-secondary)] px-8 py-1.5 flex items-center justify-between">
             {/* Left: Pending Changes */}
             <div className="text-body-24" style={{ color: 'var(--text-secondary)' }}>
-              {pendingChanges + pendingActivityChanges} Pending {(pendingChanges + pendingActivityChanges) === 1 ? 'Change' : 'Changes'}
+              {pendingChanges + pendingActivityChanges + pendingCalendarChanges} Pending {(pendingChanges + pendingActivityChanges + pendingCalendarChanges) === 1 ? 'Change' : 'Changes'}
             </div>
 
             {/* Right: Action Buttons */}
@@ -633,6 +723,7 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
                   // Reset pending changes
                   setPendingHiddenActivityNames(new Set(initialHiddenActivityNames));
                   setPendingHiddenIssueIds(new Set(initialHiddenIssueIds));
+                  setPendingHiddenCalendarIds(new Set(initialHiddenCalendarIds));
                   onClose();
                 }}
                 className="px-4 py-1 rounded-full text-body-24 font-semibold border border-[color:var(--text-primary)]"
@@ -648,22 +739,27 @@ export function ManageFilterModal({ isOpen, onClose }: ManageFilterModalProps) {
                   // Update initial state to match pending (for next modal open)
                   setInitialHiddenActivityNames(new Set(pendingHiddenActivityNames));
                   setInitialHiddenIssueIds(new Set(pendingHiddenIssueIds));
+                  setInitialHiddenCalendarIds(new Set(pendingHiddenCalendarIds));
                   
                   // Save to localStorage
                   if (typeof window !== 'undefined') {
                     localStorage.setItem('hiddenActivityNames', JSON.stringify(Array.from(pendingHiddenActivityNames)));
                     localStorage.setItem('hiddenIssueIds', JSON.stringify(Array.from(pendingHiddenIssueIds)));
+                    localStorage.setItem('hiddenCalendarIds', JSON.stringify(Array.from(pendingHiddenCalendarIds)));
                   }
                   
                   // Notify components that hidden state changed (triggers re-render)
                   refreshHiddenState();
+                  
+                  // Show message to user
+                  alert('Filter settings saved! Please refresh the page to see the changes.');
                   
                   onClose();
                 }}
                 className="px-4 py-1 rounded-full text-body-24 font-semibold"
                 style={{
                   backgroundColor: 'var(--primary)',
-                  color: 'var(--text-inverse)',
+                  color: 'var(--inverse-color)',
                 }}
               >
                 Save and Close

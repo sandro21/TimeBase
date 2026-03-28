@@ -28,25 +28,6 @@ export function GlobalFilterBar() {
   } = useFilter();
 
   const { events, refreshEvents } = useEvents();
-  
-  // Check if we should open the filter modal (from upload) - must be before early return
-  useEffect(() => {
-    // Only check on pages where the filter bar is shown
-    if (pathname === "/upload" || pathname === "/process" || pathname === "/privacy" || pathname === "/terms") {
-      return;
-    }
-    
-    if (searchParams.get('openFilter') === 'true') {
-      setIsFilterModalOpen(true);
-      // Remove the query parameter from URL
-      const newSearchParams = new URLSearchParams(searchParams.toString());
-      newSearchParams.delete('openFilter');
-      const newUrl = newSearchParams.toString() 
-        ? `${pathname}?${newSearchParams.toString()}`
-        : pathname;
-      router.replace(newUrl);
-    }
-  }, [searchParams, pathname, router]);
 
   // Track scroll position
   useEffect(() => {
@@ -58,8 +39,8 @@ export function GlobalFilterBar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Hide filter bar on upload, process, privacy, and terms pages
-  if (pathname === "/upload" || pathname === "/process" || pathname === "/privacy" || pathname === "/terms") {
+  // Hide filter bar on home, process, privacy, and terms pages
+  if (pathname === "/" || pathname === "/process" || pathname === "/privacy" || pathname === "/terms") {
     return null;
   }
 
@@ -74,8 +55,8 @@ export function GlobalFilterBar() {
       // Refresh events context (will be empty now)
       refreshEvents();
       
-      // Navigate to upload page
-      router.push('/upload');
+      // Navigate to home page
+      router.push('/');
     }
   };
 
@@ -227,7 +208,7 @@ export function GlobalFilterBar() {
         <div className="flex flex-col items-center justify-center gap-1 pointer-events-auto">
           {/* Combined capsule with filter options and navigation */}
           <div 
-            className="px-1 py-1 flex flex-row items-center gap-1 bg-[color:var(--bg-white)] rounded-full"
+            className="px-1 py-1 flex flex-row items-center gap-1 bg-[color:var(--inverse-color)] rounded-full"
             style={{
               boxShadow: 'var(--card-shadow)',
             }}

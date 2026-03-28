@@ -94,7 +94,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
       refreshEvents();
       
       // Navigate to dashboard and open filter modal
-      router.push('/all-activity?openFilter=true');
+      router.push('/all-activity');
     } catch (err) {
       console.error('Error processing files:', err);
       setError("Failed to process calendar files. Please ensure they are valid .ics files.");
@@ -135,21 +135,25 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
     }
   };
 
-  const handleCalendarSelection = async (selectedCalendars: any[]) => {
+  const handleCalendarSelection = async (allCalendars: any[]) => {
     setShowCalendarSelector(false);
     setIsConnectingGoogle(true);
     setError(null);
 
     try {
-      // Fetch events from selected calendars only
+      // Load hidden calendar IDs to determine which ones to fetch events for
+      const hiddenCalendarIds = new Set(JSON.parse(localStorage.getItem('hiddenCalendarIds') || '[]'));
+      
+      // Fetch events from all calendars (both visible and hidden)
+      // Hidden ones will be stored but not shown in the UI
       const allEvents: CalendarEvent[] = [];
       const newCalendars: any[] = [];
 
-      for (const calendar of selectedCalendars) {
+      for (const calendar of allCalendars) {
         if (!calendar) continue;
 
         try {
-          // Fetch events from this calendar
+          // Fetch events from this calendar (even if hidden)
           const events = await fetchAllGoogleCalendarEvents(
             googleAccessToken,
             calendar.id
@@ -158,7 +162,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
           if (events.length > 0) {
             allEvents.push(...events);
             
-            // Store calendar info
+            // Store calendar info (for both visible and hidden calendars)
             newCalendars.push({
               id: `google-${calendar.id}`,
               name: calendar.summary || 'Untitled Calendar',
@@ -180,7 +184,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
         return;
       }
 
-      // Save calendars directly to localStorage
+      // Save ALL calendars to localStorage (hidden ones are already marked in GoogleCalendarSelector)
       const storedCalendars = JSON.parse(localStorage.getItem('uploadedCalendars') || '[]');
       storedCalendars.push(...newCalendars);
       localStorage.setItem('uploadedCalendars', JSON.stringify(storedCalendars));
@@ -202,7 +206,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
       refreshEvents();
       
       // Navigate to dashboard and open filter modal
-      router.push('/all-activity?openFilter=true');
+      router.push('/all-activity');
     } catch (err: any) {
       console.error('Error importing calendars:', err);
       setError(err.message || "Failed to import calendars. Please try again.");

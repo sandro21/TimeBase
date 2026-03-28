@@ -36,8 +36,6 @@ export function DashboardClient({ events }: DashboardClientProps) {
     minDate,
     maxDate,
   } = useFilter();
-  const { hiddenStateVersion } = useEvents(); // Subscribe to hidden state changes
-
   // Filter events by time range
   const timeFilteredEvents = filterEventsByTimeRange(
     events,

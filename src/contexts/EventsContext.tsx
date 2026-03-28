@@ -34,10 +34,17 @@ export function EventsProvider({
       // Load removed event IDs
       const removedEventIds = new Set(JSON.parse(localStorage.getItem('removedEventIds') || '[]'));
       
+      // Load hidden calendar IDs
+      const hiddenCalendarIds = new Set(JSON.parse(localStorage.getItem('hiddenCalendarIds') || '[]'));
+      
       // Load Google Calendar events stored separately
       const googleEvents = JSON.parse(localStorage.getItem('googleCalendarEvents') || '{}');
       
       for (const calendar of storedCalendars) {
+        // Skip hidden calendars
+        if (hiddenCalendarIds.has(calendar.id)) {
+          continue;
+        }
         let events: CalendarEvent[] = [];
         
         // Check if this is a Google calendar

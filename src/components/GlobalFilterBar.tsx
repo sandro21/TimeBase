@@ -31,8 +31,6 @@ export function GlobalFilterBar() {
   if (
     pathname === "/" ||
     pathname === "/process" ||
-    pathname === "/privacy" ||
-    pathname === "/terms" ||
     pathname === "/billing" ||
     pathname === "/calendar" ||
     pathname === "/chat"

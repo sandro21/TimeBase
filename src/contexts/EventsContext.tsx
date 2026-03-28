@@ -66,8 +66,13 @@ export function EventsProvider({
         }
         
         // Apply title mappings and filter removed events
+        // Also filter out future events (events after today)
+        const now = new Date();
+        now.setHours(23, 59, 59, 999); // End of today
+        
         const processedEvents = events
           .filter((event) => !removedEventIds.has(event.id))
+          .filter((event) => event.start <= now) // Filter out future events
           .map((event) => {
             const mappedTitle = titleMappings[event.title];
             if (mappedTitle) {

@@ -14,7 +14,7 @@ interface GoogleCalendarItem {
 
 interface GoogleCalendarSelectorProps {
   calendars: GoogleCalendarItem[];
-  onConfirm: (selectedCalendarIds: string[]) => void;
+  onConfirm: (selectedCalendars: GoogleCalendarItem[]) => void;
   onCancel: () => void;
 }
 
@@ -71,7 +71,9 @@ export function GoogleCalendarSelector({
       alert("Please select at least one calendar");
       return;
     }
-    onConfirm(Array.from(selectedIds));
+    // Pass full calendar objects instead of just IDs
+    const selectedCalendars = sortedCalendars.filter(cal => selectedIds.has(cal.id));
+    onConfirm(selectedCalendars);
   };
 
   return (

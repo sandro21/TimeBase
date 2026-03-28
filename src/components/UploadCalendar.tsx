@@ -82,23 +82,19 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
         return;
       }
 
-      // Store new calendars temporarily for processing
-      // We'll save to permanent storage after user processes the data
-      const processingData = {
-        newCalendars,
-        events: allEvents,
-        uploadedAt: new Date().toISOString(),
-      };
-      sessionStorage.setItem('processingCalendars', JSON.stringify(processingData));
+      // Save calendars directly to localStorage
+      const storedCalendars = JSON.parse(localStorage.getItem('uploadedCalendars') || '[]');
+      storedCalendars.push(...newCalendars);
+      localStorage.setItem('uploadedCalendars', JSON.stringify(storedCalendars));
+
+      // For ICS files, events are already in the calendar's icsText, so no need to store separately
+      // (EventsContext will parse them when loading)
+
+      // Refresh events context
+      refreshEvents();
       
-      // Show warning if some files failed
-      if (errors.length > 0) {
-        // Store errors in sessionStorage too
-        sessionStorage.setItem('uploadErrors', JSON.stringify(errors));
-      }
-      
-      // Navigate to process page
-      router.push('/process');
+      // Navigate to dashboard and open filter modal
+      router.push('/all-activity?openFilter=true');
     } catch (err) {
       console.error('Error processing files:', err);
       setError("Failed to process calendar files. Please ensure they are valid .ics files.");
@@ -139,7 +135,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
     }
   };
 
-  const handleCalendarSelection = async (selectedCalendarIds: string[]) => {
+  const handleCalendarSelection = async (selectedCalendars: any[]) => {
     setShowCalendarSelector(false);
     setIsConnectingGoogle(true);
     setError(null);
@@ -149,8 +145,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
       const allEvents: CalendarEvent[] = [];
       const newCalendars: any[] = [];
 
-      for (const calendarId of selectedCalendarIds) {
-        const calendar = availableCalendars.find(cal => cal.id === calendarId);
+      for (const calendar of selectedCalendars) {
         if (!calendar) continue;
 
         try {
@@ -169,6 +164,7 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
               name: calendar.summary || 'Untitled Calendar',
               source: 'google',
               googleCalendarId: calendar.id,
+              accessRole: calendar.accessRole, // Store access role to identify read-only calendars
               uploadedAt: new Date().toISOString(),
             });
           }
@@ -184,16 +180,29 @@ export function UploadCalendar({ onUploadComplete }: UploadCalendarProps) {
         return;
       }
 
-      // Store for processing
-      const processingData = {
-        newCalendars,
-        events: allEvents,
-        uploadedAt: new Date().toISOString(),
-      };
-      sessionStorage.setItem('processingCalendars', JSON.stringify(processingData));
+      // Save calendars directly to localStorage
+      const storedCalendars = JSON.parse(localStorage.getItem('uploadedCalendars') || '[]');
+      storedCalendars.push(...newCalendars);
+      localStorage.setItem('uploadedCalendars', JSON.stringify(storedCalendars));
+
+      // For Google calendars, store events separately
+      const googleEvents = JSON.parse(localStorage.getItem('googleCalendarEvents') || '{}');
+      newCalendars.forEach((calendar: any) => {
+        if (calendar.source === 'google') {
+          // Store events for this Google calendar
+          const calendarEvents = allEvents.filter(
+            (event) => event.calendarId === calendar.id
+          );
+          googleEvents[calendar.id] = calendarEvents;
+        }
+      });
+      localStorage.setItem('googleCalendarEvents', JSON.stringify(googleEvents));
+
+      // Refresh events context
+      refreshEvents();
       
-      // Navigate to process page
-      router.push('/process');
+      // Navigate to dashboard and open filter modal
+      router.push('/all-activity?openFilter=true');
     } catch (err: any) {
       console.error('Error importing calendars:', err);
       setError(err.message || "Failed to import calendars. Please try again.");

@@ -11,6 +11,8 @@ import {
   CalendarEvent,
 } from "@/lib/calculations/stats";
 import { filterEventsByTimeRange, getFirstEventDate, getLastEventDate } from "@/lib/calculations/filter-events";
+import { filterHiddenEvents } from "@/lib/calculations/filter-hidden";
+import { useEvents } from "@/contexts/EventsContext";
 import { ContributionsCalendar } from "@/components/ContributionsCalendar";
 import { ActivityDayOfWeekChart } from "@/components/ActivityDayOfWeekChart";
 import { TimeLoggedChart } from "@/components/TimeLoggedChart";
@@ -18,7 +20,7 @@ import { ActivityDurationChart } from "@/components/ActivityDurationChart";
 import { ActivityScatterLineChart } from "@/components/ActivityScatterLineChart";
 import { TimeOfDayChart } from "@/components/TimeOfDayChart";
 import { ActivityPeakMonthChart } from "@/components/ActivityPeakMonthChart";
-import { ActivityBreadcrumbSearch } from "@/components/ActivityBreadcrumbSearch";
+import { ActivityBreadcrumbSearchWrapper } from "@/components/ActivityBreadcrumbSearchWrapper";
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', { 
@@ -57,6 +59,7 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
     maxDate,
     setMaxDate,
   } = useFilter();
+  const { hiddenStateVersion } = useEvents(); // Subscribe to hidden state changes
 
 
   // Determine search mode based on searchType parameter
@@ -74,7 +77,7 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
   });
 
   // Then filter by time range
-  const filteredEvents = filterEventsByTimeRange(
+  const timeFilteredEvents = filterEventsByTimeRange(
     activityFilteredEvents,
     selectedFilter,
     currentYear,
@@ -82,6 +85,12 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
     minDate,
     maxDate
   );
+
+  // Filter out hidden activities/issues for statistics only
+  const filteredEvents = filterHiddenEvents(timeFilteredEvents);
+  
+  // Keep all events for breadcrumb search (not filtered by hidden)
+  const allEventsForSearch = timeFilteredEvents;
 
   // Pass the display name (with or without quotes) to stats
   const displayName = isExactMatch ? searchString : `"${searchString}"`;
@@ -161,7 +170,7 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
   return (
     <>
       {/* Activity Breadcrumb Search */}
-      <ActivityBreadcrumbSearch events={events} />
+      <ActivityBreadcrumbSearchWrapper events={allEventsForSearch} />
 
       {/* All Sections Grouped */}
       <div className="sections-container">
@@ -197,7 +206,7 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
 
           {/* 4. Bottom - Daily Average */}
           <div className="card-soft flex flex-col items-center justify-center text-center px-6">
-            <h3 className="text-card-title text-[color:var(--text-primary)]">Daily Average</h3>
+            <h3 className="text-card-title">Daily Average</h3>
             <div className="mt-4 text-number-large text-[color:var(--primary)]">
               {formatAsCompactHoursMinutes(dailyAverage)}
             </div>
@@ -205,7 +214,7 @@ export function ActivityPageClient({ events, searchString, searchType, timeFilte
 
           {/* 5. Bottom - Weekly Average */}
           <div className="card-soft flex flex-col items-center justify-center text-center px-6">
-            <h3 className="text-card-title text-[color:var(--text-primary)]">Weekly Average</h3>
+            <h3 className="text-card-title">Weekly Average</h3>
             <div className="mt-4 text-number-large text-[color:var(--primary)]">
               {formatAsCompactHoursMinutes(weeklyAverage)}
             </div>

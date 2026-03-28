@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Search, ChevronDown } from "lucide-react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { CalendarEvent } from "@/lib/calculations/stats";
@@ -21,20 +21,22 @@ export function ActivityBreadcrumbSearch({ events }: ActivityBreadcrumbSearchPro
   const searchParams = useSearchParams();
   
   // Get current search param to display in breadcrumb
-  const currentActivity = pathname === "/activity" ? searchParams?.get("search") : null;
-  const searchType = searchParams?.get("type") || "string";
+  const currentActivity = pathname === "/activity" ? (searchParams?.get("search") || null) : null;
+  const searchType = (searchParams?.get("type") || "string");
   
-  // Get all unique activities
-  const allActivities = getUniqueActivities(events);
+  // Get all unique activities - memoize to prevent recalculation
+  const allActivities = useMemo(() => getUniqueActivities(events), [events]);
 
   // Calculate total event count for search term (substring matching)
-  const getTotalEventCountForSearch = (search: string): number => {
-    if (!search || search.trim().length < 1) return 0;
-    const normalizedSearch = search.toLowerCase().trim();
-    return events.filter(event => 
-      event.title.toLowerCase().includes(normalizedSearch)
-    ).length;
-  };
+  const getTotalEventCountForSearch = useMemo(() => {
+    return (search: string): number => {
+      if (!search || search.trim().length < 1) return 0;
+      const normalizedSearch = search.toLowerCase().trim();
+      return events.filter(event => 
+        event.title.toLowerCase().includes(normalizedSearch)
+      ).length;
+    };
+  }, [events]);
 
   // Filter activities based on search term
   useEffect(() => {

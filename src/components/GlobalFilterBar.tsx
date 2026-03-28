@@ -4,19 +4,19 @@ import { Trash2, SlidersHorizontal } from "lucide-react";
 import { useFilter } from "@/contexts/FilterContext";
 // import { ActivitySearchWrapper } from "@/components/ActivitySearchWrapper";
 import { useEvents } from "@/contexts/EventsContext";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { ManageFilterModal } from "@/components/ManageFilterModal";
 
 export function GlobalFilterBar() {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [scrollY, setScrollY] = useState(0);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   
-  // Hide filter bar on upload, process, privacy, and terms pages
-  if (pathname === "/upload" || pathname === "/process" || pathname === "/privacy" || pathname === "/terms") {
-    return null;
-  }
-  const {//love
+  // Call all hooks before any early returns (Rules of Hooks)
+  const {
     selectedFilter,
     setSelectedFilter,
     currentYear,
@@ -28,6 +28,40 @@ export function GlobalFilterBar() {
   } = useFilter();
 
   const { events, refreshEvents } = useEvents();
+  
+  // Check if we should open the filter modal (from upload) - must be before early return
+  useEffect(() => {
+    // Only check on pages where the filter bar is shown
+    if (pathname === "/upload" || pathname === "/process" || pathname === "/privacy" || pathname === "/terms") {
+      return;
+    }
+    
+    if (searchParams.get('openFilter') === 'true') {
+      setIsFilterModalOpen(true);
+      // Remove the query parameter from URL
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      newSearchParams.delete('openFilter');
+      const newUrl = newSearchParams.toString() 
+        ? `${pathname}?${newSearchParams.toString()}`
+        : pathname;
+      router.replace(newUrl);
+    }
+  }, [searchParams, pathname, router]);
+
+  // Track scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  // Hide filter bar on upload, process, privacy, and terms pages
+  if (pathname === "/upload" || pathname === "/process" || pathname === "/privacy" || pathname === "/terms") {
+    return null;
+  }
 
   const handleClearData = () => {
     if (typeof window !== 'undefined') {
@@ -143,20 +177,6 @@ export function GlobalFilterBar() {
     return false;
   };
 
-  const handleCleanData = () => {
-    // Load existing events and go to processing page
-    router.push('/process');
-  };
-
-  // Track scroll position
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // Calculate top position based on scroll
   // Starts at 80px (top-20), moves to 10px as we scroll
@@ -183,12 +203,13 @@ export function GlobalFilterBar() {
 
         {/* Right: Navigation Buttons */}
         <div className="flex flex-row items-center gap-2">
-          <button
-            className="header-nav-button text-body-24 text-[color:var(--text-primary)] px-4 py-1 flex items-center gap-2"
-          >
-            <SlidersHorizontal size={20} />
-            Manage and Filter
-          </button>
+        <button
+          className="header-nav-button text-body-24 text-[color:var(--text-primary)] px-4 py-1 flex items-center gap-2"
+          onClick={() => setIsFilterModalOpen(true)}
+        >
+          <SlidersHorizontal size={20} />
+          Manage and Filter
+        </button>
           <button
             className="header-delete-button flex items-center justify-center p-2"
             onClick={handleClearData}
@@ -263,6 +284,12 @@ export function GlobalFilterBar() {
           </div>
         </div>
       </div>
+
+      {/* Manage Filter Modal */}
+      <ManageFilterModal 
+        isOpen={isFilterModalOpen} 
+        onClose={() => setIsFilterModalOpen(false)} 
+      />
     </div>
   );
 }

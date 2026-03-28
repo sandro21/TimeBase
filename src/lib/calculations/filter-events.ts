@@ -66,15 +66,23 @@ export function filterEventsByTimeRange(
 
 export function getFirstEventDate(events: CalendarEvent[]): Date | null {
   if (events.length === 0) return null;
-  
-  const sorted = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
-  return sorted[0].start;
+
+  let minTs = events[0].start.getTime();
+  for (let i = 1; i < events.length; i++) {
+    const t = events[i].start.getTime();
+    if (t < minTs) minTs = t;
+  }
+  return new Date(minTs);
 }
 
 export function getLastEventDate(events: CalendarEvent[]): Date | null {
   if (events.length === 0) return null;
-  
-  const sorted = [...events].sort((a, b) => b.start.getTime() - a.start.getTime());
-  return sorted[0].start;
+
+  let maxTs = events[0].start.getTime();
+  for (let i = 1; i < events.length; i++) {
+    const t = events[i].start.getTime();
+    if (t > maxTs) maxTs = t;
+  }
+  return new Date(maxTs);
 }
 
